@@ -15,6 +15,8 @@ use Syde\Vendor\Worldline\Inpsyde\PaymentGateway\Icon;
 use Syde\Vendor\Worldline\Inpsyde\PaymentGateway\IconProviderInterface;
 use Syde\Vendor\Worldline\Inpsyde\PaymentGateway\PaymentGateway;
 use Syde\Vendor\Worldline\Inpsyde\PaymentGateway\StaticIconProvider;
+use Syde\Vendor\Worldline\Inpsyde\WorldlineForWoocommerce\Config\ConfigContainer;
+use Syde\Vendor\Worldline\Inpsyde\WorldlineForWoocommerce\Config\ConfigModule;
 use Syde\Vendor\Worldline\Inpsyde\WorldlineForWoocommerce\Vaulting\WcTokenRepository;
 use Syde\Vendor\Worldline\Inpsyde\WorldlineForWoocommerce\WorldlinePaymentGateway\Admin\RenderCaptureAction;
 use Syde\Vendor\Worldline\Inpsyde\WorldlineForWoocommerce\WorldlinePaymentGateway\Admin\StatusUpdateAction;
@@ -63,6 +65,9 @@ return static function () : array {
             }
             return $gateway;
         }),
+        'config.logo_url' => new Factory(['config.container'], static function (ConfigContainer $configContainer) : string {
+            return $configContainer->get(ConfigModule::LOGO_URL_OPTION);
+        }),
         'worldline_payment_gateway.api.default_test_endpoint' => new Value($config['TEST_ENDPOINT']),
         'worldline_payment_gateway.api.default_live_endpoint' => new Value($config['LIVE_ENDPOINT']),
         'worldline_payment_gateway.api.integrator-name' => new Value('Inpsyde'),
@@ -82,7 +87,7 @@ return static function () : array {
         }),
         "payment_gateway.{$gatewayId}.refund_processor" => new Constructor(RefundProcessor::class, ['worldline_payment_gateway.api.client', 'worldline_payment_gateway.amount_of_money_factory', 'worldline_payment_gateway.refund_validator']),
         'worldline_payment_gateway.refund_validator' => new Constructor(RefundValidator::class),
-        "payment_gateway.{$gatewayId}.method_title" => static fn(): string => \__('Worldline Global Online Pay for WooCommerce', 'worldline-for-woocommerce'),
+        "payment_gateway.{$gatewayId}.method_title" => static fn(): string => \__($config['GATEWAY_METHOD_TITLE'], 'worldline-for-woocommerce'),
         "payment_gateway.{$gatewayId}.title" => new Factory(['config.primary_gateway_title'], static function (string $customTitle) : string {
             if (!empty($customTitle)) {
                 return $customTitle;
@@ -105,9 +110,9 @@ return static function () : array {
                 return $currencySupportValidator->wlopSupportStoreCurrency();
             };
         }),
-        "payment_gateway.{$gatewayId}.method_icon_provider" => new Factory(['assets.get_module_static_asset_url'], static function (callable $getStaticAssetUrl) : IconProviderInterface {
-            /** @var string $src */
-            $src = $getStaticAssetUrl(WorldlinePaymentGatewayModule::PACKAGE_NAME, "images/worldline-logo.svg");
+        "payment_gateway.{$gatewayId}.method_icon_provider" => new Factory(['config.logo_url', 'assets.get_module_static_asset_url'], static function (string $logoUrl, callable $getStaticAssetUrl) : IconProviderInterface {
+            $src = $logoUrl !== '' ? $logoUrl : $getStaticAssetUrl(WorldlinePaymentGatewayModule::PACKAGE_NAME, "images/worldline-logo.svg");
+            $getStaticAssetUrl(WorldlinePaymentGatewayModule::PACKAGE_NAME, "images/worldline-logo.svg");
             $icon = new Icon('worldline-logo', $src, 'Worldline logo');
             return new StaticIconProvider($icon);
         }),
@@ -173,6 +178,27 @@ return static function () : array {
         },
         'worldline_payment_gateway.customer_screen_width' => static function () : ?int {
             $key = 'wlop_screen_width';
+            if (isset($_POST[$key]) && \is_numeric($_POST[$key])) {
+                return (int) $_POST[$key];
+            }
+            return null;
+        },
+        'worldline_payment_gateway.customer_color_depth' => static function () : ?int {
+            $key = 'wlop_color_depth';
+            if (isset($_POST[$key]) && \is_numeric($_POST[$key])) {
+                return (int) $_POST[$key];
+            }
+            return null;
+        },
+        'worldline_payment_gateway.customer_java_enabled' => static function () : ?bool {
+            $key = 'wlop_java_enabled';
+            if (isset($_POST[$key])) {
+                return 'true' === $_POST[$key];
+            }
+            return null;
+        },
+        'worldline_payment_gateway.customer_timezone_offset' => static function () : ?int {
+            $key = 'wlop_timezone_offset';
             if (isset($_POST[$key]) && \is_numeric($_POST[$key])) {
                 return (int) $_POST[$key];
             }
